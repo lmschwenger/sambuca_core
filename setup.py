@@ -1,6 +1,7 @@
-from setuptools import setup, find_packages
 import os
 import sys
+
+from setuptools import setup, find_packages
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'sambuca', 'core'))
 from sambuca.core import __version__
@@ -10,7 +11,7 @@ setup(
     version=__version__,
     author="Lasse M. Schwenger",
     author_email="lasse.m.schwenger@gmail.com",
-    description="A short description of sambuca_core",
+    description="Implementation of the SAMBUCA model (Semi-Analytical Model for Bathymetry, Un-mixing, and Concentration Assessment) developed by CSIRO for remote sensing applications.",
     long_description=open("README.md").read() if os.path.exists("README.md") else "",
     long_description_content_type="text/markdown",
     url="https://github.com/lmschwenger/sambuca_core",
