@@ -1,10 +1,10 @@
 """Management of Spectral Inherent Optical Properties (SIOPs) for different sensors."""
 
+import csv
 import os
 from typing import Dict, List, Tuple, Optional, Any, Union
 
 import numpy as np
-import pandas as pd
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 
@@ -67,32 +67,49 @@ class SIOPManager:
                         # Create library name from file name and parent directory
                         file_base = os.path.splitext(parts[-1])[0]
 
-                        # Load CSV
-                        df = pd.read_csv(filepath)
-
+                        # Load CSV using built-in csv module
+                        with open(filepath, 'r', newline='', encoding='utf-8') as csvfile:
+                            # Detect delimiter
+                            sample = csvfile.read(1024)
+                            csvfile.seek(0)
+                            sniffer = csv.Sniffer()
+                            delimiter = sniffer.sniff(sample).delimiter
+                            
+                            # Read CSV data
+                            reader = csv.reader(csvfile, delimiter=delimiter)
+                            rows = list(reader)
+                        
+                        if len(rows) < 2:
+                            print(f"Skipping {file}: insufficient data")
+                            continue
+                        
+                        # Get header and data
+                        header = rows[0]
+                        data_rows = rows[1:]
+                        
+                        # Convert to numpy arrays
+                        data_array = np.array(data_rows, dtype=float)
+                        
                         # Check number of columns
-                        if len(df.columns) == 2:
+                        if len(header) == 2:
                             # Simple two-column format
-                            wavelength_col = df.columns[0]
-                            value_col = df.columns[1]
-
-                            # Use file name without extension as library name
                             library_name = file_base.lower()
 
                             libraries[library_name] = (
-                                df[wavelength_col].values,
-                                df[value_col].values
+                                data_array[:, 0],  # wavelengths
+                                data_array[:, 1]   # values
                             )
                             print(f"Loaded {library_name} from {rel_path}")
                         else:
                             # Multi-column format
-                            wavelength_col = df.columns[0]
+                            wavelengths = data_array[:, 0]
 
-                            for col in df.columns[1:]:
-                                library_name = f"{file_base}_{col}".lower()
+                            for col_idx in range(1, len(header)):
+                                col_name = header[col_idx]
+                                library_name = f"{file_base}_{col_name}".lower()
                                 libraries[library_name] = (
-                                    df[wavelength_col].values,
-                                    df[col].values
+                                    wavelengths,
+                                    data_array[:, col_idx]
                                 )
                                 print(f"Loaded {library_name} from {rel_path}")
                     except Exception as e:

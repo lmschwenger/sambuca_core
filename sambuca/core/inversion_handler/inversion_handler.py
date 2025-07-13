@@ -152,9 +152,9 @@ class InversionHandler:
                 'lut_size': len(lookup_table.param_array)
             }
         )
-    
+
+    @staticmethod
     def _invert_pixels(
-        self,
         pixel_spectra: NDArray[np.float64],
         lookup_table: LookUpTable,
         metric: str,
