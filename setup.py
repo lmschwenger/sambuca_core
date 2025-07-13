@@ -1,8 +1,13 @@
 from setuptools import setup, find_packages
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'sambuca', 'core'))
+from sambuca.core import __version__
 
 setup(
     name="sambuca-core",
-    version="0.1.0",
+    version=__version__,
     author="Lasse M. Schwenger",
     author_email="lasse.m.schwenger@gmail.com",
     description="A short description of sambuca_core",
