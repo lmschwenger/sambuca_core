@@ -16,6 +16,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/lmschwenger/sambuca_core",
     packages=find_packages(),
+    namespace_packages=['sambuca'],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
