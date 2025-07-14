@@ -8,6 +8,8 @@ import itertools
 import os
 import pickle
 import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Tuple, Union, Optional, Any
 
 import numpy as np
@@ -16,6 +18,50 @@ from tqdm import tqdm
 
 from ..forward_model import forward_model
 from ..siop_manager import SIOPManager
+
+
+@dataclass
+class FixedParameter:
+    """Fixed parameter with a single value."""
+    value: float
+
+
+@dataclass  
+class RangeParameter:
+    """Range parameter with min/max values and number of points."""
+    min_val: float
+    max_val: float
+    n: int
+
+
+class ParameterType:
+    """Parameter type factory for creating fixed and range parameters."""
+    
+    @staticmethod
+    def FIXED(value: float) -> FixedParameter:
+        """Create a fixed parameter.
+        
+        Args:
+            value: The fixed value for this parameter.
+            
+        Returns:
+            FixedParameter instance.
+        """
+        return FixedParameter(value)
+    
+    @staticmethod
+    def RANGE(min_val: float, max_val: float, n: int) -> RangeParameter:
+        """Create a range parameter.
+        
+        Args:
+            min_val: Minimum value of the range.
+            max_val: Maximum value of the range.
+            n: Number of values to generate in this range.
+            
+        Returns:
+            RangeParameter instance.
+        """
+        return RangeParameter(min_val, max_val, n)
 
 
 class LookUpTable:
@@ -27,22 +73,35 @@ class LookUpTable:
     """
 
     def __init__(self, siop_manager: SIOPManager, wavelengths: List[float], 
-                 parameter_ranges: Dict[str, Tuple[float, float]], 
-                 fixed_parameters: Optional[Dict[str, float]] = None):
-        """Initialize the look-up table with SIOP manager and parameter ranges.
+                 options: Dict[str, Union[FixedParameter, RangeParameter]]):
+        """Initialize the look-up table with SIOP manager and parameter options.
 
         Args:
             siop_manager: SIOPManager instance for getting spectral data.
             wavelengths: List of wavelengths to use for forward model calculations.
-            parameter_ranges: Dictionary mapping parameter names to (min, max) tuples for LUT dimensions.
-            fixed_parameters: Dictionary of fixed parameter values for parameters not in ranges.
+            options: Dictionary with parameter definitions. Use ParameterType.FIXED(value) for fixed parameters
+                    and ParameterType.RANGE(min_val, max_val, n) for range parameters.
+                    Must include: chl, depth, cdom, nap, substrate_fraction.
         """
         self.siop_manager = siop_manager
         self.wavelengths = wavelengths
-        self.parameter_ranges = parameter_ranges
-        self.fixed_parameters = fixed_parameters or {}
-        self.param_names = list(parameter_ranges.keys())
-        self.bounds = list(parameter_ranges.values())
+        
+        # Separate fixed and range parameters from options
+        self.parameter_ranges = {}
+        self.fixed_parameters = {}
+        self.grid_sizes = {}  # Store n values for each range parameter
+        
+        for param_name, param_def in options.items():
+            if isinstance(param_def, FixedParameter):
+                self.fixed_parameters[param_name] = param_def.value
+            elif isinstance(param_def, RangeParameter):
+                self.parameter_ranges[param_name] = (param_def.min_val, param_def.max_val)
+                self.grid_sizes[param_name] = param_def.n
+            else:
+                raise ValueError(f"Parameter {param_name} must be either FixedParameter or RangeParameter")
+        
+        self.param_names = list(self.parameter_ranges.keys())
+        self.bounds = list(self.parameter_ranges.values())
         self.points = {}  # Dict mapping parameter tuples to spectra
         self.param_array = None  # Array form of parameters
         self.spectra_array = None  # Array form of spectra
@@ -60,7 +119,6 @@ class LookUpTable:
 
     def build_table(
             self,
-            grid_size: Union[int, List[int]] = 10,
             progress_bar: bool = True,
             memory_optimized: bool = False,
             batch_size: int = 1000,
@@ -68,7 +126,6 @@ class LookUpTable:
         """Build the look-up table by running the forward model for parameter combinations.
 
         Args:
-            grid_size: Number of points along each parameter dimension (can be int or list).
             progress_bar: Whether to show a progress bar.
             memory_optimized: If True, reduce memory usage by not keeping all spectra in a dict.
             batch_size: Number of parameter combinations to process in each batch.
@@ -82,14 +139,12 @@ class LookUpTable:
         if not self.bounds:
             raise ValueError("No parameters specified for LUT generation")
 
-        # Create parameter grid
-        if isinstance(grid_size, int):
-            grid_size = [grid_size] * len(self.bounds)
-
+        # Create parameter grid using the n values from RangeParameter definitions
         self.param_values = []
-        for i, bound in enumerate(self.bounds):
-            low, high = bound
-            self.param_values.append(np.linspace(low, high, grid_size[i]))
+        for param_name in self.param_names:
+            low, high = self.parameter_ranges[param_name]
+            n = self.grid_sizes[param_name]
+            self.param_values.append(np.linspace(low, high, n))
 
         self.grid_shape = tuple(len(values) for values in self.param_values)
 
@@ -231,6 +286,7 @@ class LookUpTable:
                 'wavelengths': self.wavelengths,
                 'parameter_ranges': self.parameter_ranges,
                 'fixed_parameters': self.fixed_parameters,
+                'grid_sizes': self.grid_sizes,
                 'param_names': self.param_names,
                 'bounds': self.bounds,
                 'table_built': self.table_built,
@@ -248,6 +304,7 @@ class LookUpTable:
                 'wavelengths': self.wavelengths,
                 'parameter_ranges': self.parameter_ranges,
                 'fixed_parameters': self.fixed_parameters,
+                'grid_sizes': self.grid_sizes,
                 'param_names': self.param_names,
                 'bounds': self.bounds,
                 'param_array': self.param_array,
@@ -303,9 +360,16 @@ class LookUpTable:
             with open(filename + "_attrs", 'rb') as f:
                 attrs_data = pickle.load(f)
 
+            # Reconstruct options dictionary from saved data
+            options = {}
+            for param_name, value in attrs_data['fixed_parameters'].items():
+                options[param_name] = ParameterType.FIXED(value)
+            for param_name, (min_val, max_val) in attrs_data['parameter_ranges'].items():
+                n = attrs_data['grid_sizes'][param_name]
+                options[param_name] = ParameterType.RANGE(min_val, max_val, n)
+                
             # Create instance
-            lut = cls(siop_manager, attrs_data['wavelengths'], attrs_data['parameter_ranges'], 
-                     attrs_data.get('fixed_parameters', {}))
+            lut = cls(siop_manager, attrs_data['wavelengths'], options)
             lut.param_names = attrs_data['param_names']
             lut.bounds = attrs_data['bounds']
             lut.table_built = attrs_data['table_built']
@@ -329,8 +393,15 @@ class LookUpTable:
             with open(filename, 'rb') as f:
                 data = pickle.load(f)
 
-            lut = cls(siop_manager, data['wavelengths'], data['parameter_ranges'], 
-                     data.get('fixed_parameters', {}))
+            # Reconstruct options dictionary from saved data
+            options = {}
+            for param_name, value in data['fixed_parameters'].items():
+                options[param_name] = ParameterType.FIXED(value)
+            for param_name, (min_val, max_val) in data['parameter_ranges'].items():
+                n = data['grid_sizes'][param_name]
+                options[param_name] = ParameterType.RANGE(min_val, max_val, n)
+                
+            lut = cls(siop_manager, data['wavelengths'], options)
             lut.param_names = data['param_names']
             lut.bounds = data['bounds']
             lut.param_array = data['param_array']

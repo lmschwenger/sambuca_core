@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from sambuca.core.inversion_handler import InversionHandler, InversionResult
-from sambuca.core.lookup_table import LookUpTable
+from sambuca.core.lookup_table import LookUpTable, ParameterType
 from sambuca.core.siop_manager import SIOPManager
 
 
@@ -24,6 +24,15 @@ class TestInversionHandler(unittest.TestCase):
         
         # Define test parameters
         self.wavelengths = [400, 450, 500, 550, 600]
+        self.options = {
+            'chl': ParameterType.RANGE(0.1, 2.0, 5),
+            'cdom': ParameterType.RANGE(0.01, 0.5, 5),
+            'nap': ParameterType.FIXED(0.1),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
+        # Keep old format for backward compatibility where needed
         self.parameter_ranges = {
             'chl': (0.1, 2.0),
             'cdom': (0.01, 0.5),
@@ -38,10 +47,9 @@ class TestInversionHandler(unittest.TestCase):
         self.lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=self.options
         )
-        self.lut.build_table(grid_size=5, progress_bar=False)  # Small grid for speed
+        self.lut.build_table(progress_bar=False)  # Grid size now in options
         
         # Create inversion handler
         self.handler = InversionHandler()
@@ -270,8 +278,7 @@ class TestInversionHandler(unittest.TestCase):
         unbuilt_lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=self.options
         )
         
         with self.assertRaises(ValueError) as cm:

@@ -1,3 +1,3 @@
-from .lookup_table import LookUpTable
+from .lookup_table import LookUpTable, ParameterType
 
-__all__ = ['LookUpTable']
+__all__ = ['LookUpTable', 'ParameterType']

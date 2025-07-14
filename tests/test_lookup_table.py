@@ -3,7 +3,7 @@ import tempfile
 import os
 import numpy as np
 
-from sambuca.core.lookup_table import LookUpTable
+from sambuca.core.lookup_table import LookUpTable, ParameterType
 from sambuca.core.siop_manager import SIOPManager
 
 
@@ -22,8 +22,17 @@ class TestLookUpTable(unittest.TestCase):
             self._create_test_siop_files()
             self.siop_manager = SIOPManager(self.temp_dir)
         
-        # Define test wavelengths and parameter ranges
+        # Define test wavelengths and parameter options
         self.wavelengths = [400, 450, 500, 550, 600]
+        self.options = {
+            'chl': ParameterType.RANGE(0.1, 2.0, 3),
+            'cdom': ParameterType.RANGE(0.01, 0.5, 3),
+            'nap': ParameterType.FIXED(0.1),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
+        # Keep old format for backward compatibility tests
         self.parameter_ranges = {
             'chl': (0.1, 2.0),
             'cdom': (0.01, 0.5),
@@ -74,8 +83,7 @@ class TestLookUpTable(unittest.TestCase):
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=self.options
         )
         
         # Check initialization
@@ -95,12 +103,11 @@ class TestLookUpTable(unittest.TestCase):
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=self.options
         )
         
-        # Build with small grid for speed
-        lut.build_table(grid_size=3, progress_bar=False)
+        # Build table (grid size is now defined in options)
+        lut.build_table(progress_bar=False)
         
         # Check table was built
         self.assertTrue(lut.table_built)
@@ -119,14 +126,22 @@ class TestLookUpTable(unittest.TestCase):
 
     def test_build_table_memory_optimized(self):
         """Test building table with memory optimization."""
+        # Create options with smaller grid for this test
+        options = {
+            'chl': ParameterType.RANGE(0.1, 2.0, 2),
+            'cdom': ParameterType.RANGE(0.01, 0.5, 2),
+            'nap': ParameterType.FIXED(0.1),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=options
         )
         
-        lut.build_table(grid_size=2, memory_optimized=True, progress_bar=False)
+        lut.build_table(memory_optimized=True, progress_bar=False)
         
         self.assertTrue(lut.table_built)
         self.assertFalse(lut.in_memory)
@@ -134,15 +149,23 @@ class TestLookUpTable(unittest.TestCase):
 
     def test_save_and_load_compressed(self):
         """Test saving and loading with compressed format."""
+        # Create options with smaller grid for this test
+        options = {
+            'chl': ParameterType.RANGE(0.1, 2.0, 2),
+            'cdom': ParameterType.RANGE(0.01, 0.5, 2),
+            'nap': ParameterType.FIXED(0.1),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=options
         )
         
         # Build table
-        lut.build_table(grid_size=2, progress_bar=False)
+        lut.build_table(progress_bar=False)
         
         # Save to temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.lut') as tmp_file:
@@ -178,15 +201,23 @@ class TestLookUpTable(unittest.TestCase):
 
     def test_save_and_load_uncompressed(self):
         """Test saving and loading with uncompressed format."""
+        # Create options with smaller grid for this test
+        options = {
+            'chl': ParameterType.RANGE(0.1, 2.0, 2),
+            'cdom': ParameterType.RANGE(0.01, 0.5, 2),
+            'nap': ParameterType.FIXED(0.1),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=options
         )
         
         # Build table
-        lut.build_table(grid_size=2, progress_bar=False)
+        lut.build_table(progress_bar=False)
         
         # Save to temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pkl') as tmp_file:
@@ -217,15 +248,23 @@ class TestLookUpTable(unittest.TestCase):
 
     def test_get_spectra_cube(self):
         """Test getting spectra as a parameter cube."""
+        # Create options with smaller grid for this test
+        options = {
+            'chl': ParameterType.RANGE(0.1, 2.0, 2),
+            'cdom': ParameterType.RANGE(0.01, 0.5, 2),
+            'nap': ParameterType.FIXED(0.1),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges=self.parameter_ranges,
-            fixed_parameters=self.fixed_parameters
+            options=options
         )
         
         # Build small table
-        lut.build_table(grid_size=2, progress_bar=False)
+        lut.build_table(progress_bar=False)
         
         # Get spectra cube
         spectra_cube, param_values = lut.get_spectra_cube()
@@ -243,31 +282,47 @@ class TestLookUpTable(unittest.TestCase):
         """Test parameter validation."""
         # Test missing required parameters
         with self.assertRaises(ValueError) as cm:
+            options_missing = {
+                'chl': ParameterType.RANGE(0.1, 2.0, 3),  # Missing other required params
+            }
             LookUpTable(
                 siop_manager=self.siop_manager,
                 wavelengths=self.wavelengths,
-                parameter_ranges={'chl': (0.1, 2.0)},  # Missing other required params
-                fixed_parameters={}
+                options=options_missing
             )
         self.assertIn("Missing required parameters", str(cm.exception))
         
-        # Test parameter conflicts (same param in both ranges and fixed)
+        # Test invalid parameter type
         with self.assertRaises(ValueError) as cm:
+            options_invalid = {
+                'chl': 1.0,  # Should be ParameterType.FIXED(1.0) or ParameterType.RANGE(...)
+                'cdom': ParameterType.FIXED(0.1),
+                'nap': ParameterType.FIXED(0.05),
+                'depth': ParameterType.FIXED(10.0),
+                'substrate_fraction': ParameterType.FIXED(1.0)
+            }
             LookUpTable(
                 siop_manager=self.siop_manager,
                 wavelengths=self.wavelengths,
-                parameter_ranges={'chl': (0.1, 2.0)},
-                fixed_parameters={'chl': 1.0, 'cdom': 0.1, 'nap': 0.05, 'depth': 10.0, 'substrate_fraction': 1.0}
+                options=options_invalid
             )
-        self.assertIn("cannot be both variable and fixed", str(cm.exception))
+        self.assertIn("must be either FixedParameter or RangeParameter", str(cm.exception))
 
     def test_error_handling(self):
         """Test error handling for various edge cases."""
+        # Create options with no variable parameters (all fixed)
+        options_all_fixed = {
+            'chl': ParameterType.FIXED(1.0),
+            'cdom': ParameterType.FIXED(0.1),
+            'nap': ParameterType.FIXED(0.05),
+            'depth': ParameterType.FIXED(10.0),
+            'substrate_fraction': ParameterType.FIXED(1.0)
+        }
+        
         lut = LookUpTable(
             siop_manager=self.siop_manager,
             wavelengths=self.wavelengths,
-            parameter_ranges={},  # Empty parameter ranges
-            fixed_parameters={'chl': 1.0, 'cdom': 0.1, 'nap': 0.05, 'depth': 10.0, 'substrate_fraction': 1.0}
+            options=options_all_fixed
         )
         
         # Should raise error when trying to build with no variable parameters
