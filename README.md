@@ -65,29 +65,25 @@ print(f"Available libraries: {siop_manager.list_available_libraries()}")
 ### 3. Lookup Table Generation
 
 ```python
-from sambuca.core.lookup_table import LookUpTable
+from sambuca.core.lookup_table import LookUpTable, ParameterType
 
-# Define parameter ranges for lookup table
-parameter_ranges = {
-    'chl': (0.1, 5.0),
-    'cdom': (0.01, 1.0),
-}
-
-fixed_parameters = {
-    'nap': 0.1,
-    'depth': 10.0,
-    'substrate_fraction': 1.0
+# Define parameters using the new options-based API
+options = {
+    'chl': ParameterType.RANGE(0.1, 5.0, 20),     # min, max, n_points
+    'cdom': ParameterType.RANGE(0.01, 1.0, 20),   # min, max, n_points
+    'nap': ParameterType.FIXED(0.1),              # fixed value
+    'depth': ParameterType.FIXED(10.0),           # fixed value
+    'substrate_fraction': ParameterType.FIXED(1.0) # fixed value
 }
 
 # Create and build lookup table
 lut = LookUpTable(
     siop_manager=siop_manager,
     wavelengths=wavelengths,
-    parameter_ranges=parameter_ranges,
-    fixed_parameters=fixed_parameters
+    options=options
 )
 
-lut.build_table(grid_size=20)
+lut.build_table()  # Grid size is now specified per parameter
 lut.save('my_lookup_table.pkl')
 ```
 
