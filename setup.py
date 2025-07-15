@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'sambuca', 'core'))
 from sambuca.core import __version__
 
 setup(
-    name="sambuca-core",
+    name="sambuca.core",
     version=__version__,
     author="Lasse M. Schwenger",
     author_email="lasse.m.schwenger@gmail.com",
